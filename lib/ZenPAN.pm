@@ -14,15 +14,31 @@ __END__
 
 =head1 NAME
 
-ZenPAN - blah blah blah
+ZenPAN - yet yet another DarkPAN repository manager.
 
 =head1 SYNOPSIS
 
-  use ZenPAN;
+  $cat zenfile
+  # from git
+  git@github.com:tokuhirom/Log-Pony.git TOKUHIOM
+
+  # from local file (using OrePAN)
+  /path/to/MyModule-0.01.tar.gz XAICRON
+
+  # from cpan (using cpanm)
+  JSON::WebToken
+  App::envfile~0.06
+
+  $ zenpan -p /path/to/repository zenfile
+  ...
+
+  $ cpanm --mirror=file:///path/to/repository MyModule
+  Success!
 
 =head1 DESCRIPTION
 
-ZenPAN is
+ZenPAN is simple wrapper of L<< OrePAN >> and L<< cpanm >>.
+Easy to create a DarkPAN from I<< git >>, I<< tarball >>, and I<< CPAN >>.
 
 =head1 AUTHOR
 
@@ -38,5 +54,9 @@ This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =head1 SEE ALSO
+
+L<< OrePAN >>
+
+L<< App::cpanminus >>
 
 =cut

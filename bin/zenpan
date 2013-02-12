@@ -1,0 +1,217 @@
+#!perl
+
+use strict;
+use warnings;
+use feature 'say';
+use Capture::Tiny qw(capture_merged);
+use Cwd qw(realpath);
+use Term::ANSIColor qw(color colored);
+use File::Temp qw(tempdir);
+use File::Path qw(mkpath);
+use File::Which qw(which);
+use Getopt::Long qw(GetOptions);
+
+# Checking required commands
+for my $cmd (qw/cpanm orepan.pl orepan_index.pl git/) {
+    which $cmd or die colored(['bold red'], "ERROR: `$cmd` command not found!"), "\n";
+}
+
+our $COMMAND_DEPTH = 1;
+our $COLOR_MAP     = {
+    1 => 'green',
+    2 => 'yellow',
+    3 => 'cyan',
+};
+
+my $default_pause_id = 'DUMMY';
+
+my $path = 'zenpan';
+GetOptions(
+    'h|help!'  => \&usage,
+    'p|path=s' => \$path,
+) or usage();
+
+$path = realpath $path;
+mkdir $path;
+
+my $zenfile = shift || usage();
+
+say 'Creating darkpan from zenfle...';
+my $targets = load_zenfile($zenfile);
+for my $target (@$targets) {
+    save_dist(@$target{qw/dist pause_id/});
+}
+
+say 'Reindexing...';
+reindex($path);
+
+say 'done.';
+
+sub load_zenfile {
+    my $file = shift;
+    my $targets = [];
+    open my $fh, '<', $zenfile or die "$!: $zenfile";
+    while (my $line = readline $fh) {
+        chomp $line;
+        next if $line =~ /^\s*$/;
+        next if $line =~ /^#/;
+        my ($dist, $pause_id) = split /\s+/, $line;
+        push @$targets, {
+            dist     => $dist,
+            pause_id => $pause_id || $default_pause_id,
+        };
+    }
+
+    return $targets;
+}
+
+sub save_dist {
+    my ($dist, $pause_id) = @_;
+    $pause_id ||= $default_pause_id;
+
+    if ($dist =~ m|^https?://\w+\.|) {
+        run_cpanm($path, $dist);
+    }
+    elsif ($dist =~ /tar\.gz$/) {
+        run_orepan($path, $pause_id, $dist);
+    }
+    elsif ($dist =~ /^git.*.git$/) {
+        run_git($path, $pause_id, $dist);
+    }
+    else {
+        run_cpanm($path, $dist);
+    }
+}
+
+sub run {
+    my @cmd = @_;
+    my $indent = sprintf '%s> ', '==' x $COMMAND_DEPTH;
+    my $indent_color = $COLOR_MAP->{$COMMAND_DEPTH} || 'bule';
+    say color($indent_color), $indent, color('reset'), join q{ }, @cmd;
+    capture_merged { !system @cmd };
+#    !system @cmd;
+}
+
+sub run_cpanm {
+    my ($path, @args) = @_;
+
+    local $ENV{PERL_CPANM_OPT};
+    run cpanm => (
+        '--save-dists', $path,
+        '--notest',
+        '--quiet',
+        '--force',
+        @args,
+    );
+}
+
+sub run_orepan {
+    my ($path, $pause_id, $dist) = @_;
+    run 'orepan.pl' => (
+        '--destination', $path,
+        '--pause', $pause_id,
+        $dist,
+    );
+}
+
+sub run_git {
+    my ($path, $pause_id, $repos) = @_;
+    my $dir = tempdir CLEANUP => 1;
+    chdir $dir or die "$!: $dir";
+
+    run 'git', 'clone', $repos, "$dir/temp$$";
+    chdir "temp$$" or die "$!: $dir";
+
+    local $COMMAND_DEPTH = $COMMAND_DEPTH + 1;
+    if (-f 'Build.PL') {
+        run $^X, 'Build.PL';
+        unless (-f 'MANIFEST') {
+            run $^X, './Build', 'manifest';
+        }
+        run $^X, './Build', 'dist';
+    }
+    elsif (-f 'Makefile.PL') {
+        run $^X, 'Makefile.PL';
+        unless (-f 'MANIFEST') {
+            run 'make', 'manifest';
+        }
+        run 'make', 'dist';
+    }
+    else {
+        say STDERR colored ['bold red'], "ERROR: $repos not perl module repository";
+        return;
+    }
+
+    my ($dist) = <*.tar.gz>;
+    unless (-f $dist) {
+        say STDERR colored ['bold red'], "ERROR: cannot create dist file from $repos";
+        return;
+    }
+
+    local $COMMAND_DEPTH = $COMMAND_DEPTH + 1;
+    run_orepan($path, $pause_id, $dist);
+}
+
+sub reindex {
+    my $path = shift;
+    unlink "$path/modules/02packages.details.txt.gz";
+    run 'orepan_index.pl', '--repository', $path;
+}
+
+sub usage {
+    print << "USAGE";
+Usage: $0 [option] zenfile
+
+Options:
+  --path, -p  Save archives path. (default: ./zenpan)
+  --help, -h  Show this message.
+
+`zenfile` details are SEE ALSO "perldoc ZenPAN".
+
+USAGE
+
+    exit;
+}
+
+__END__
+
+=encoding utf8
+
+=head1 NAME
+
+zenpan - yet yet another DarkPAN repository manager.
+
+=head1 SYNOPSIS
+
+  # create repository from zenfile into ./zenpan
+  $ zenpan zenfile
+
+  # set repository path
+  $ zenpan -p /path/to/repository zenfile
+
+  # and use it
+  % cpanm --mirror-only --mirror=file:///path/to/repository Foo
+
+I<< zenfile >> details are SEE ALSO C<< perldoc ZenPAN >>.
+
+=head1 DESCRIPTION
+
+ZenPAN is simple wrapper of L<< OrePAN >> and L<< cpanm >>.
+Easy to create a DarkPAN from I<< git >>, I<< tarball >>, and I<< CPAN >>.
+
+=head1 AUTHOR
+
+Yuji Shimada E<lt>xaicron {@} GMAIL.COME<gt>
+
+=head1 COPYRIGHT
+
+Copyright 2013 - Yuji Shimada
+
+=head1 LICENSE
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=head1 SEE ALSO
+
+=cut
