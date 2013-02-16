@@ -3,12 +3,14 @@
 use strict;
 use warnings;
 use feature 'say';
+use ZenPAN;
 use Capture::Tiny qw(capture_merged);
 use Cwd qw(realpath);
 use Term::ANSIColor qw(color colored);
 use File::Temp qw(tempdir);
 use File::Path qw(mkpath);
 use File::Which qw(which);
+use File::Basename qw(basename);
 use Getopt::Long qw(GetOptions);
 
 # Checking required commands
@@ -27,8 +29,9 @@ my $default_pause_id = 'DUMMY';
 
 my $path = 'zenpan';
 GetOptions(
-    'h|help!'  => \&usage,
-    'p|path=s' => \$path,
+    'V|version!' => \&show_version,
+    'h|help!'    => \&usage,
+    'p|path=s'   => \$path,
 ) or usage();
 
 $path = realpath $path;
@@ -159,8 +162,9 @@ sub reindex {
 }
 
 sub usage {
+    my $me = basename $0;
     print << "USAGE";
-Usage: $0 [option] zenfile
+Usage: $me [option] zenfile
 
 Options:
   --path, -p  Save archives path. (default: ./zenpan)
@@ -170,6 +174,14 @@ Options:
 
 USAGE
 
+    exit;
+}
+
+sub show_version {
+    my $me = basename $0;
+    print << "SHOW_VERSION";
+$me (ZenPAN) version $ZenPAN::VERSION
+SHOW_VERSION
     exit;
 }
 
