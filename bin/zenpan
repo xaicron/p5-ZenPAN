@@ -257,6 +257,7 @@ Usage: $me [command] [option] ...
 Options:
   --path,    -p  Save archives path. (required)
   --help,    -h  Show this message.
+  --verbose, -v  Chatty print,
   --version, -V  Show version.
 
 Command:
