@@ -4,14 +4,17 @@ use strict;
 use warnings;
 use feature 'say';
 use ZenPAN;
-use Capture::Tiny qw(capture_merged);
+use Capture::Tiny ':all';
 use Cwd qw(realpath);
+use Cwd::Guard qw(cwd_guard);
 use Term::ANSIColor qw(color colored);
 use File::Temp qw(tempdir);
 use File::Path qw(mkpath);
 use File::Which qw(which);
 use File::Basename qw(basename);
 use Getopt::Long qw(GetOptions);
+
+my $zenpan_cmmand = realpath $0;
 
 # Checking required commands
 for my $cmd (qw/cpanm orepan.pl orepan_index.pl git/) {
@@ -27,37 +30,97 @@ our $COLOR_MAP     = {
 
 my $default_pause_id = 'DUMMY';
 
-my $path = 'zenpan';
 GetOptions(
     'V|version!' => \&show_version,
+    'v|verbose!' => \my $verbose,
     'h|help!'    => \&usage,
-    'p|path=s'   => \$path,
+    'p|path=s'   => \my $path,
 ) or usage();
+usage() unless defined $path;
 
-$path = realpath $path;
-mkdir $path;
+main: {
+    my $cmd = shift @ARGV || 'add';
+    my $code = main->can("cmd_$cmd");
+    unless ($code) {
+        say STDERR "$cmd is not a command";
+        usage();
+    }
 
-my $zenfile = shift || usage();
+    $code->($path);
 
-say 'Creating darkpan from zenfle...';
-my $targets = load_zenfile($zenfile);
-for my $target (@$targets) {
-    save_dist(@$target{qw/dist pause_id/});
+    say 'done.';
 }
 
-say 'Reindexing...';
-reindex($path);
+exit;
 
-say 'done.';
+sub cmd_add {
+    my ($path) = @_;
+    $path = realpath $path;
+    mkpath $path;
+
+    my $targets;
+    if (@ARGV) {
+        $targets = [ map +{ dist => $_ }, @ARGV ];
+    }
+    else {
+        unless ($targets = challeng_load_argv_from_fh()) {
+            usage() unless -f '.zenfile';
+            $targets = load_zenfile('.zenfile');
+        }
+    }
+
+    say "Addting to $path ...";
+    for my $target (@$targets) {
+        save_dist($path, @$target{qw/dist pause_id/});
+    }
+
+    cmd_reindex($path);
+}
+
+sub cmd_remove {
+    my ($path) = @_;
+
+    # TODO
+    ...
+}
+
+sub cmd_reindex {
+    my ($path) = @_;
+
+    say 'Reindexing...';
+    reindex($path);
+}
+
+sub cmd_clean {
+    my ($path) = @_;
+
+    say 'Cleaning...';
+    # TODO
+    ...
+}
 
 sub load_zenfile {
     my $file = shift;
+    open my $fh, '<', $file or die "$!: $file";
+    parse_from_fh($fh);
+}
+
+sub challeng_load_argv_from_fh {
+    return unless $0 ne '-' && !-t STDIN;
+    parse_from_fh(*STDIN);
+}
+
+sub parse_from_fh {
+    my $fh = shift;
+
     my $targets = [];
-    open my $fh, '<', $zenfile or die "$!: $zenfile";
-    while (my $line = readline $fh) {
+    while (defined (my $line = readline $fh)) {
         chomp $line;
-        next if $line =~ /^\s*$/;
-        next if $line =~ /^#/;
+        $line =~ s/^\s+|\s+$//g;  # trim spaces
+        $line =~ s/#.*$//;        # remove trailing comment
+        next if $line =~ /^\s*$/; # empry line
+        next if $line =~ /^#/;    # comment line
+
         my ($dist, $pause_id) = split /\s+/, $line;
         push @$targets, {
             dist     => $dist,
@@ -69,8 +132,10 @@ sub load_zenfile {
 }
 
 sub save_dist {
-    my ($dist, $pause_id) = @_;
+    my ($path, $dist, $pause_id) = @_;
     $pause_id ||= $default_pause_id;
+
+    say colored ['underline bold'], "Working $dist ...";
 
     if ($dist =~ m|^https?://\w+\.|) {
         run_cpanm($path, $dist);
@@ -78,7 +143,7 @@ sub save_dist {
     elsif ($dist =~ /tar\.gz$/) {
         run_orepan($path, $pause_id, $dist);
     }
-    elsif ($dist =~ /^git.*.git$/) {
+    elsif ($dist =~ /\.git$/) {
         run_git($path, $pause_id, $dist);
     }
     else {
@@ -91,8 +156,12 @@ sub run {
     my $indent = sprintf '%s> ', '==' x $COMMAND_DEPTH;
     my $indent_color = $COLOR_MAP->{$COMMAND_DEPTH} || 'bule';
     say color($indent_color), $indent, color('reset'), join q{ }, @cmd;
-    capture_merged { !system @cmd };
-#    !system @cmd;
+    if ($verbose) {
+        tee_merged { !system @cmd };
+    }
+    else {
+        capture_merged { !system @cmd };
+    }
 }
 
 sub run_cpanm {
@@ -100,10 +169,10 @@ sub run_cpanm {
 
     local $ENV{PERL_CPANM_OPT};
     run cpanm => (
+        '-L', $path,
         '--save-dists', $path,
         '--notest',
         '--quiet',
-        '--force',
         @args,
     );
 }
@@ -117,27 +186,46 @@ sub run_orepan {
     );
 }
 
+sub run_perl {
+    my (@args) = @_;
+    local $ENV{PERL_CPANM_OPT};
+    run $^X, @args;
+}
+
+sub run_zenpan {
+    my ($path) = @_;
+    run_perl $zenpan_cmmand, '-p', $path, 'add';
+}
+
 sub run_git {
     my ($path, $pause_id, $repos) = @_;
     my $dir = tempdir CLEANUP => 1;
-    chdir $dir or die "$!: $dir";
+    my $guard = cwd_guard $dir or die "$!: $dir";
 
     run 'git', 'clone', $repos, "$dir/temp$$";
-    chdir "temp$$" or die "$!: $dir";
+    my $guard2 = cwd_guard "temp$$" or die "$!: $dir";
 
     local $COMMAND_DEPTH = $COMMAND_DEPTH + 1;
     if (-f 'Build.PL') {
-        run $^X, 'Build.PL';
+        run_perl 'Build.PL';
         unless (-f 'MANIFEST') {
-            run $^X, './Build', 'manifest';
+            run_perl './Build', 'manifest';
         }
-        run $^X, './Build', 'dist';
+        if (-f '.zenfile') {
+            run_zenpan $path;
+        }
+        run_cpanm $path, '--installdeps', '.';
+        run_perl './Build', 'dist';
     }
     elsif (-f 'Makefile.PL') {
-        run $^X, 'Makefile.PL';
+        run_perl 'Makefile.PL';
         unless (-f 'MANIFEST') {
             run 'make', 'manifest';
         }
+        if (-f '.zenfile') {
+            run_zenpan $path;
+        }
+        run_cpanm $path, '--installdeps', '.';
         run 'make', 'dist';
     }
     else {
@@ -164,13 +252,46 @@ sub reindex {
 sub usage {
     my $me = basename $0;
     print << "USAGE";
-Usage: $me [option] zenfile
+Usage: $me [command] [option] ...
 
 Options:
-  --path, -p  Save archives path. (default: ./zenpan)
-  --help, -h  Show this message.
+  --path,    -p  Save archives path. (required)
+  --help,    -h  Show this message.
+  --version, -V  Show version.
 
-`zenfile` details are SEE ALSO "perldoc ZenPAN".
+Command:
+  add        Additional into local mirror path
+  remove     Removeing modules from local mirror path
+  reindex    Regen index file
+
+Examples:
+
+  % zenpan add -p ./mirror Moo
+  % zenpan add -p ./mirror < zenfile
+
+  % cat .zenfile
+  # git URL
+  git\@github.com:xaicron/p5-DBIx-QueryLog.git XAICRON # authors is XAICRON
+  git\@github.com:tokuhirom/Furl.git TOKUHIROM         # authors is TOKUHIROM
+  https://github.com/nekokak/p5-DBIx-Handler.git      # authors is DUMMY
+
+  # tarballs URL
+  http://cpan.metacpan.org/authors/id/X/XA/XAICRON/App-envfile-0.06.tar.gz
+
+  # module name
+  SQL::Format
+  WWW::Google::Cloud::Messaging~0.03 # version specify
+  % zenpan add -p ./mirror # using .zenfile
+
+  # remove modules
+  % zepnan remove -p ./mirror SQL::Format
+  % zenpan remove -p ./mirror XAICRON/App-envfile-0.06.tar.gz
+  % zepnan remove -p ./mirror WWW::Google::Cloud::Messaging~0.03
+
+  # reindex
+  % zenpan reindex -p ./mirror
+
+`.zenfile` ditails are SEE ALSO "perldoc ZenPAN".
 
 USAGE
 
@@ -195,16 +316,36 @@ zenpan - yet yet another DarkPAN repository manager.
 
 =head1 SYNOPSIS
 
-  # create repository from zenfile into ./zenpan
-  $ zenpan zenfile
+  # create local mirror
+  % zenpan add -p ./mirror Moo
+  % zenpan add -p ./mirror < zenfile
 
-  # set repository path
-  $ zenpan -p /path/to/repository zenfile
+  % cat .zenfile
+  # git URL
+  git@github.com:xaicron/p5-DBIx-QueryLog.git XAICRON # authors is XAICRON
+  git@github.com:tokuhirom/Furl.git TOKUHIROM         # authors is TOKUHIROM
+  https://github.com/nekokak/p5-DBIx-Handler.git      # authors is DUMMY
+
+  # tarballs URL
+  http://cpan.metacpan.org/authors/id/X/XA/XAICRON/App-envfile-0.06.tar.gz
+
+  # module name
+  SQL::Format
+  WWW::Google::Cloud::Messaging~0.03 # version specify
+  % zenpan add -p ./mirror # using .zenfile
+
+  # remove modules
+  % zepnan remove -p ./mirror SQL::Format
+  % zenpan remove -p ./mirror XAICRON/App-envfile-0.06.tar.gz
+  % zepnan remove -p ./mirror WWW::Google::Cloud::Messaging~0.03
+
+  # reindex
+  % zenpan reindex -p ./mirror
 
   # and use it
-  % cpanm --mirror-only --mirror=file:///path/to/repository Foo
+  % cpanm --mirror-only --mirror=file:///path/to/mirror SQL::Format
 
-I<< zenfile >> details are SEE ALSO C<< perldoc ZenPAN >>.
+I<< zenfile >> foramt details are SEE ALSO C<< perldoc ZenPAN >>.
 
 =head1 DESCRIPTION
 
