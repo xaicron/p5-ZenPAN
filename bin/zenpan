@@ -13,6 +13,8 @@ use File::Path qw(mkpath);
 use File::Which qw(which);
 use File::Basename qw(basename);
 use Getopt::Long qw(GetOptions);
+use Module::CPANfile;
+use CPAN::DistnameInfo;
 
 my $zenpan_cmmand = realpath $0;
 
@@ -63,10 +65,8 @@ sub cmd_add {
         $targets = [ map +{ dist => $_ }, @ARGV ];
     }
     else {
-        unless ($targets = challeng_load_argv_from_fh()) {
-            usage() unless -f '.zenfile';
-            $targets = load_zenfile('.zenfile');
-        }
+        usage() unless -f 'cpanfile';
+        $targets = load_cpanfile('cpanfile');
     }
 
     say "Addting to $path ...";
@@ -99,33 +99,31 @@ sub cmd_clean {
     ...
 }
 
-sub load_zenfile {
-    my $file = shift;
-    open my $fh, '<', $file or die "$!: $file";
-    parse_from_fh($fh);
-}
-
-sub challeng_load_argv_from_fh {
-    return unless $0 ne '-' && !-t STDIN;
-    parse_from_fh(*STDIN);
-}
-
-sub parse_from_fh {
-    my $fh = shift;
-
+sub load_cpanfile {
+    my $file    = shift;
     my $targets = [];
-    while (defined (my $line = readline $fh)) {
-        chomp $line;
-        $line =~ s/^\s+|\s+$//g;  # trim spaces
-        $line =~ s/#.*$//;        # remove trailing comment
-        next if $line =~ /^\s*$/; # empry line
-        next if $line =~ /^#/;    # comment line
 
-        my ($dist, $pause_id) = split /\s+/, $line;
-        push @$targets, {
-            dist     => $dist,
-            pause_id => $pause_id || $default_pause_id,
-        };
+    local $ENV{ZENPAN_MODE} = 1;
+
+    my $spec = Module::CPANfile->load($file)->{result}{spec};
+    for my $phase (@$spec{qw/build runtime/}) {
+        my $requires = $phase->{requires};
+        for my $name (sort keys %$requires) {
+            my $version = $requires->{$name};
+            my $pause_id;
+            if (ref $version eq 'HASH') {
+                $name     = $version->{from} if $version->{from};
+                $pause_id = $version->{author};
+            }
+            else {
+                $name .= '~'.$version;
+            }
+
+            push @$targets, {
+                dist     => $name,
+                $pause_id ? (pause_id => $pause_id) : (),
+            };
+        }
     }
 
     return $targets;
@@ -137,14 +135,14 @@ sub save_dist {
 
     say colored ['underline bold'], "Working $dist ...";
 
-    if ($dist =~ m|^https?://\w+\.|) {
+    if ($dist =~ /\.git$/) {
+        run_git($path, $pause_id, $dist);
+    }
+    elsif ($dist =~ m|^https?://\w+\.|) {
         run_cpanm($path, $dist);
     }
     elsif ($dist =~ /tar\.gz$/) {
         run_orepan($path, $pause_id, $dist);
-    }
-    elsif ($dist =~ /\.git$/) {
-        run_git($path, $pause_id, $dist);
     }
     else {
         run_cpanm($path, $dist);
@@ -177,6 +175,14 @@ sub run_cpanm {
     );
 }
 
+sub install_from_mirror {
+    my ($path, $dist_path) = @_;
+    my $dist = CPAN::DistnameInfo->new($dist_path);
+    (my $name = $dist->dist) =~ s/-/::/g;
+    my $target = sprintf '%s~%s', $name, $dist->version;
+    run_cpanm $path, '--mirror', "file://$path", $target;
+}
+
 sub run_orepan {
     my ($path, $pause_id, $dist) = @_;
     run 'orepan.pl' => (
@@ -184,6 +190,8 @@ sub run_orepan {
         '--pause', $pause_id,
         $dist,
     );
+
+    install_from_mirror $path, $dist;
 }
 
 sub run_perl {
@@ -211,7 +219,7 @@ sub run_git {
         unless (-f 'MANIFEST') {
             run_perl './Build', 'manifest';
         }
-        if (-f '.zenfile') {
+        if (-f 'cpanfile') {
             run_zenpan $path;
         }
         run_cpanm $path, '--installdeps', '.';
@@ -222,7 +230,7 @@ sub run_git {
         unless (-f 'MANIFEST') {
             run 'make', 'manifest';
         }
-        if (-f '.zenfile') {
+        if (-f 'cpanfile') {
             run_zenpan $path;
         }
         run_cpanm $path, '--installdeps', '.';
@@ -240,7 +248,7 @@ sub run_git {
     }
 
     local $COMMAND_DEPTH = $COMMAND_DEPTH + 1;
-    run_orepan($path, $pause_id, $dist);
+    run_orepan $path, $pause_id, $dist;
 }
 
 sub reindex {
@@ -267,32 +275,38 @@ Command:
 
 Examples:
 
+  # add modules from CPAN
   % zenpan add -p ./mirror Moo
-  % zenpan add -p ./mirror < zenfile
 
-  % cat .zenfile
+  # add modules from cpanfile
+  % zenpan add -p ./mirror
+
+  % cat cpanfile
   # git URL
-  git\@github.com:xaicron/p5-DBIx-QueryLog.git XAICRON # authors is XAICRON
-  git\@github.com:tokuhirom/Furl.git TOKUHIROM         # authors is TOKUHIROM
-  https://github.com/nekokak/p5-DBIx-Handler.git      # authors is DUMMY
+  requires 'DBIx::QueryLog' => do {
+      \$ENV{ZENPAN_MODE} ? {
+          from   => 'git\@github.com:xaicron/p5-DBIx-QueryLog.git',
+          author => 'XAICRON', # default is DUMMY
+      } : '0';
+  };
 
   # tarballs URL
-  http://cpan.metacpan.org/authors/id/X/XA/XAICRON/App-envfile-0.06.tar.gz
+  requires 'App::envfile' => do {
+      \$ENV{ZENPAN_MODE} ? {
+          from => 'http://cpan.metacpan.org/authors/id/X/XA/XAICRON/App-envfile-0.06.tar.gz',
+  };
 
-  # module name
-  SQL::Format
-  WWW::Google::Cloud::Messaging~0.03 # version specify
-  % zenpan add -p ./mirror # using .zenfile
+  # normal case
+  requires 'SQL::Format' => '0';
+  requires 'WWW::Google::Cloud::Messaging' => '0.03';
 
-  # remove modules
+  # remove modules (TODO)
   % zepnan remove -p ./mirror SQL::Format
   % zenpan remove -p ./mirror XAICRON/App-envfile-0.06.tar.gz
   % zepnan remove -p ./mirror WWW::Google::Cloud::Messaging~0.03
 
   # reindex
   % zenpan reindex -p ./mirror
-
-`.zenfile` ditails are SEE ALSO "perldoc ZenPAN".
 
 USAGE
 
@@ -318,24 +332,32 @@ zenpan - yet yet another DarkPAN repository manager.
 =head1 SYNOPSIS
 
   # create local mirror
+  # add modules from CPAN
   % zenpan add -p ./mirror Moo
-  % zenpan add -p ./mirror < zenfile
 
-  % cat .zenfile
+  # add modules from cpanfile
+  % zenpan add -p ./mirror
+
+  % cat cpanfile
   # git URL
-  git@github.com:xaicron/p5-DBIx-QueryLog.git XAICRON # authors is XAICRON
-  git@github.com:tokuhirom/Furl.git TOKUHIROM         # authors is TOKUHIROM
-  https://github.com/nekokak/p5-DBIx-Handler.git      # authors is DUMMY
+  requires 'DBIx::QueryLog' => do {
+      \$ENV{ZENPAN_MODE} ? {
+          from   => 'git\@github.com:xaicron/p5-DBIx-QueryLog.git',
+          author => 'XAICRON', # default is DUMMY
+      } : '0';
+  };
 
   # tarballs URL
-  http://cpan.metacpan.org/authors/id/X/XA/XAICRON/App-envfile-0.06.tar.gz
+  requires 'App::envfile' => do {
+      \$ENV{ZENPAN_MODE} ? {
+          from => 'http://cpan.metacpan.org/authors/id/X/XA/XAICRON/App-envfile-0.06.tar.gz',
+  };
 
-  # module name
-  SQL::Format
-  WWW::Google::Cloud::Messaging~0.03 # version specify
-  % zenpan add -p ./mirror # using .zenfile
+  # normal case
+  requires 'SQL::Format' => '0';
+  requires 'WWW::Google::Cloud::Messaging' => '0.03';
 
-  # remove modules
+  # remove modules (TODO)
   % zepnan remove -p ./mirror SQL::Format
   % zenpan remove -p ./mirror XAICRON/App-envfile-0.06.tar.gz
   % zepnan remove -p ./mirror WWW::Google::Cloud::Messaging~0.03

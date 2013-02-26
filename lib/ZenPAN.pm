@@ -18,18 +18,28 @@ ZenPAN - yet yet another DarkPAN repository manager.
 
 =head1 SYNOPSIS
 
-  $cat zenfile
+  $cat cpanfile
   # from git
-  git@github.com:tokuhirom/Log-Pony.git TOKUHIOM
+  requires 'Log::Pony' => do {
+      $ENV{ZENPAN_MODE} ? {
+          from   => 'git@github.com:tokuhirom/Log-Pony.git',
+          author => 'TOKUHIOM',
+      } : '0.01';
+  };
 
   # from local file (using OrePAN)
-  /path/to/MyModule-0.01.tar.gz XAICRON
+  requires 'MyModule' => do {
+      $ENV{ZENPAN_MODE} ? {
+          from   => '/path/to/MyModule-0.01.tar.gz',
+          author => 'XAICRON',
+      } : '0.01';
+  };
 
   # from cpan (using cpanm)
-  JSON::WebToken
-  App::envfile~0.06
+  requires 'JSON::WebToken';
+  requires 'App::envfile' => '0.06':
 
-  $ zenpan -p /path/to/repository zenfile
+  $ zenpan -p /path/to/repository
   ...
 
   $ cpanm --mirror=file:///path/to/repository MyModule
