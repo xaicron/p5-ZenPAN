@@ -15,6 +15,7 @@ use File::Basename qw(basename);
 use Getopt::Long qw(GetOptions);
 use Module::CPANfile;
 use CPAN::DistnameInfo;
+use Carton;
 
 my $zenpan_cmmand = realpath $0;
 
@@ -37,17 +38,18 @@ GetOptions(
     'v|verbose!' => \my $verbose,
     'h|help!'    => \&usage,
     'p|path=s'   => \my $path,
-) or usage();
-usage() unless defined $path;
+) or short_usage();
+short_usage() unless defined $path;
 
 main: {
     my $cmd = shift @ARGV || 'add';
     my $code = main->can("cmd_$cmd");
     unless ($code) {
         say STDERR "$cmd is not a command";
-        usage();
+        short_usage();
     }
 
+    $path = realpath $path;
     $code->($path);
 
     say 'done.';
@@ -57,7 +59,6 @@ exit;
 
 sub cmd_add {
     my ($path) = @_;
-    $path = realpath $path;
     mkpath $path;
 
     my $targets;
@@ -97,6 +98,16 @@ sub cmd_clean {
     say 'Cleaning...';
     # TODO
     ...
+}
+
+sub cmd_install {
+    my ($path) = @_;
+    unless (-d "$path/authors/id" && -f -r "$path/modules/02packages.details.txt.gz") {
+        die "$path is not mirror";
+    }
+
+    local $ENV{PERL_CARTON_MIRROR} = "file://$path";
+    run('carton', 'install');
 }
 
 sub load_cpanfile {
@@ -257,10 +268,21 @@ sub reindex {
     run 'orepan_index.pl', '--repository', $path;
 }
 
+sub short_usage {
+    my $me = basename $0;
+    print << "USAGE";
+Usage: $me [command] -p /path/to/mirror ...
+
+Try `zenpan --help` or `man zenpan` for more options.
+USAGE
+
+    exit 1;
+}
+
 sub usage {
     my $me = basename $0;
     print << "USAGE";
-Usage: $me [command] [option] ...
+Usage: $me [command] -p /path/to/mirror ...
 
 Options:
   --path,    -p  Save archives path. (required)
@@ -272,6 +294,8 @@ Command:
   add        Additional into local mirror path
   remove     Removeing modules from local mirror path
   reindex    Regen index file
+
+  install    Execute carton install form local mirror path
 
 Examples:
 
@@ -307,6 +331,9 @@ Examples:
 
   # reindex
   % zenpan reindex -p ./mirror
+
+  # carton install
+  % zenpan install
 
 USAGE
 
