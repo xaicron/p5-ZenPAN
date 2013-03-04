@@ -234,6 +234,7 @@ sub run_git {
             run_zenpan $path;
         }
         run_cpanm $path, '--installdeps', '.';
+        run_perl './Build', 'distmeta';
         run_perl './Build', 'dist';
     }
     elsif (-f 'Makefile.PL') {
