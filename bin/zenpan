@@ -130,7 +130,7 @@ sub load_cpanfile {
     local $ENV{ZENPAN_MODE} = 1;
 
     my $spec = Module::CPANfile->load($file)->{result}{spec};
-    for my $phase (@$spec{qw/build runtime/}) {
+    for my $phase (@$spec{qw/configure build runtime/}) {
         my $requires = $phase->{requires};
         for my $name (sort keys %$requires) {
             my $version = $requires->{$name};
