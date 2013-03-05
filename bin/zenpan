@@ -384,15 +384,15 @@ zenpan - yet yet another DarkPAN repository manager.
   % cat cpanfile
   # git URL
   requires 'DBIx::QueryLog' => do {
-      \$ENV{ZENPAN_MODE} ? {
-          via    => 'git\@github.com:xaicron/p5-DBIx-QueryLog.git',
+      $ENV{ZENPAN_MODE} ? {
+          via    => 'git@github.com:xaicron/p5-DBIx-QueryLog.git',
           author => 'XAICRON', # default is DUMMY
       } : '0';
   };
 
   # tarballs URL
   requires 'App::envfile' => do {
-      \$ENV{ZENPAN_MODE} ? {
+      $ENV{ZENPAN_MODE} ? {
           via => 'http://cpan.metacpan.org/authors/id/X/XA/XAICRON/App-envfile-0.06.tar.gz',
   };
 
