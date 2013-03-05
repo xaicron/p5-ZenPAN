@@ -102,12 +102,24 @@ sub cmd_clean {
 
 sub cmd_install {
     my ($path) = @_;
-    unless (-d "$path/authors/id" && -f -r "$path/modules/02packages.details.txt.gz") {
-        die "$path is not mirror";
-    }
+    is_mirror($path);
 
     local $ENV{PERL_CARTON_MIRROR} = "file://$path";
     run('carton', 'install');
+}
+
+sub cmd_bundle {
+    my ($path) = @_;
+    is_mirror($path);
+
+    local $ENV{PERL_CARTON_MIRROR} = "file://$path";
+    run('carton', 'bundle');
+}
+
+sub is_mirror {
+    unless (-d "$path/authors/id" && -f -r "$path/modules/02packages.details.txt.gz") {
+        die "$path is not mirror\n";
+    }
 }
 
 sub load_cpanfile {
