@@ -1,8 +1,8 @@
 use strict;
 use warnings;
-use Module::Build;
+use Module::Build::Pluggable qw(CPANfile);
 
-my $build = Module::Build->new(
+my $build = Module::Build::Pluggable->new(
     license        => 'perl',
     dynamic_config => 0,
 
@@ -10,20 +10,12 @@ my $build = Module::Build->new(
         'Test::More'     => '0.98',
         'Test::Requires' => '0.06',
     },
-    configure_requires => { 'Module::Build' => '0.38' },
-    requires           => {
-        perl                 => '5.010001',
-        'OrePAN'             => '0',
-        'App::cpanminus'     => '1.6000',
-        'Capture::Tiny'      => '0.21',
-        'Module::CPANfile'   => '0.9009',
-        'CPAN::DistnameInfo' => '0.12',
-        'Carton'             => 'v0.9.10',
-        'Term::ANSIColor'    => '0',
-        'Cwd'                => '0',
-        'File::Which'        => '1.09',
-        'File::Temp'         => '0',
-        'File::Path'         => '0',
+    configure_requires => {
+        'Module::Build'                      => '0.40',
+        'Module::Build::Pluggable::CPANfile' => '0.02',
+    },
+    requires => {
+        perl => '5.010001',
     },
 
     no_index    => { 'directory' => [ 'inc' ] },

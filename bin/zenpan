@@ -16,6 +16,7 @@ use Getopt::Long qw(GetOptions);
 use Module::CPANfile;
 use CPAN::DistnameInfo;
 use Carton;
+use lib::core::only ();
 
 my $zenpan_cmmand = realpath $0;
 
@@ -218,14 +219,14 @@ sub run_orepan {
 }
 
 sub run_perl {
-    my (@args) = @_;
+    my ($path, @args) = @_;
     local $ENV{PERL_CPANM_OPT};
-    run $^X, @args;
+    run $^X, '-Mlib::core::only', "-Mlib=$path/lib/perl5", @args;
 }
 
 sub run_zenpan {
     my ($path) = @_;
-    run_perl $zenpan_cmmand, '-p', $path, 'add';
+    run $zenpan_cmmand, '-p', $path, 'add';
 }
 
 sub run_git {
@@ -238,26 +239,28 @@ sub run_git {
 
     local $COMMAND_DEPTH = $COMMAND_DEPTH + 1;
     if (-f 'Build.PL') {
-        run_perl 'Build.PL';
-        unless (-f 'MANIFEST') {
-            run_perl './Build', 'manifest';
-        }
         if (-f 'cpanfile') {
             run_zenpan $path;
         }
-        run_cpanm $path, '--installdeps', '.';
-        run_perl './Build', 'distmeta';
-        run_perl './Build', 'dist';
+        run_cpanm $path, '.';
+
+        run_perl $path, 'Build.PL';
+        unless (-f 'MANIFEST') {
+            run_perl $path, './Build', 'manifest';
+        }
+        run_perl $path, './Build', 'distmeta';
+        run_perl $path, './Build', 'dist';
     }
     elsif (-f 'Makefile.PL') {
-        run_perl 'Makefile.PL';
+        if (-f 'cpanfile') {
+            run_zenpan $path;
+        }
+        run_cpanm $path, '.';
+
+        run_perl $path, 'Makefile.PL';
         unless (-f 'MANIFEST') {
             run 'make', 'manifest';
         }
-        if (-f 'cpanfile') {
-            run_zenpan $path;
-        }
-        run_cpanm $path, '--installdeps', '.';
         run 'make', 'dist';
     }
     else {

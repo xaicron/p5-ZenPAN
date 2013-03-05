@@ -9,3 +9,4 @@ requires 'Cmd'                => '0';
 requires 'File::Which'        => '1.09';
 requires 'File::Temp'         => '0';
 requires 'File::Path'         => '0';
+requires 'lib::core::only'    => '0';
