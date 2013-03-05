@@ -62,17 +62,30 @@ sub cmd_add {
     my ($path) = @_;
     mkpath $path;
 
-    my $targets;
-    if (@ARGV) {
-        $targets = [ map +{ dist => $_ }, @ARGV ];
+    unless (-f 'cpanfile') {
+        say STDERR colored ['bold red'], "ERROR: cpanfile is not found";
+        exit 1;
     }
-    else {
-        usage() unless -f 'cpanfile';
-        $targets = load_cpanfile('cpanfile');
+
+    my $requires = load_cpanfile('cpanfile');
+    if (@ARGV) {
+        my $requires_map = {
+            map { $_->{name} => $_ } @$requires,
+        };
+
+        $requires = [];
+        for (@ARGV) {
+            my $target = $requires_map->{$_};
+            unless ($target) {
+                say STDERR colored ['bold red'], "ERROR: $_ is not found on cpanfile";
+                exit 1;
+            }
+            push @$requires, $target;
+        };
     }
 
     say "Addting to $path ...";
-    for my $target (@$targets) {
+    for my $target (@$requires) {
         save_dist($path, @$target{qw/dist pause_id/});
     }
 
@@ -134,17 +147,18 @@ sub load_cpanfile {
         my $requires = $phase->{requires};
         for my $name (sort keys %$requires) {
             my $version = $requires->{$name};
-            my $pause_id;
+            my ($dist, $pause_id);
             if (ref $version eq 'HASH') {
-                $name     = $version->{via} if $version->{via};
+                $dist     = $version->{via} if $version->{via};
                 $pause_id = $version->{author};
             }
             else {
-                $name .= '~'.$version;
+                $dist = $name.'~'.$version;
             }
 
             push @$targets, {
-                dist     => $name,
+                name     => $name,
+                dist     => $dist,
                 $pause_id ? (pause_id => $pause_id) : (),
             };
         }
