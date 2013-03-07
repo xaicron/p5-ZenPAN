@@ -18,7 +18,7 @@ ZenPAN - yet yet another DarkPAN repository manager.
 
 =head1 SYNOPSIS
 
-See L<< bin/zenpan >
+See L<< bin/zenpan >>
 
 =head1 DESCRIPTION
 
