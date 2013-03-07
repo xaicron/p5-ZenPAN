@@ -1,3 +1,6 @@
+configure_requires 'Module::Build'                      => '0.40';
+configure_requires 'Module::Build::Pluggable::CPANfile' => '0.02';
+
 requires 'OrePAN'             => '0.07';
 requires 'App::cpanminus'     => '1.6000';
 requires 'Capture::Tiny'      => '0.21';
@@ -10,3 +13,8 @@ requires 'File::Which'        => '1.09';
 requires 'File::Temp'         => '0';
 requires 'File::Path'         => '0';
 requires 'lib::core::only'    => '0';
+
+on test => sub {
+    requires 'Test::More'     => '0.98';
+    requires 'Test::Requires' => '0.06';
+};

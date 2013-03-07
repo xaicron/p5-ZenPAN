@@ -6,15 +6,9 @@ my $build = Module::Build::Pluggable->new(
     license        => 'perl',
     dynamic_config => 0,
 
-    build_requires     => {
-        'Test::More'     => '0.98',
-        'Test::Requires' => '0.06',
-    },
-    configure_requires => {
-        'Module::Build'                      => '0.40',
-        'Module::Build::Pluggable::CPANfile' => '0.02',
-    },
-    requires => {
+    build_requires     => {},
+    configure_requires => {},
+    requires           => {
         perl => '5.010001',
     },
 
