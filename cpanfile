@@ -1,5 +1,7 @@
-configure_requires 'Module::Build'                      => '0.40';
-configure_requires 'Module::Build::Pluggable::CPANfile' => '0.02';
+on configure => sub {
+    requires 'Module::Build'                      => '0.40';
+    requires 'Module::Build::Pluggable::CPANfile' => '0.02';
+};
 
 requires 'OrePAN'             => '0.07';
 requires 'App::cpanminus'     => '1.6000';
