@@ -16,6 +16,12 @@ requires 'File::Temp'         => '0';
 requires 'File::Path'         => '0';
 requires 'lib::core::only'    => '0';
 
+# for M::B
+requires 'Software::License'  => '0.103005';
+
+# for M::I
+requires 'Module::Install' => '1.06';
+
 on test => sub {
     requires 'Test::More'     => '0.98';
     requires 'Test::Requires' => '0.06';
