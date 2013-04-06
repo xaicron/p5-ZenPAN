@@ -34,9 +34,11 @@ our $COLOR_MAP     = {
 
 my $default_pause_id = 'DUMMY';
 
+$ENV{ZENPAN_VERBOSE} = 0;
+
 GetOptions(
     'V|version!' => \&show_version,
-    'v|verbose!' => \my $verbose,
+    'v|verbose!' => \$ENV{ZENPAN_VERBOSE},
     'h|help!'    => \&usage,
     'p|path=s'   => \my $path,
 ) or short_usage();
@@ -192,7 +194,7 @@ sub run {
     my $indent = sprintf '%s> ', '==' x $COMMAND_DEPTH;
     my $indent_color = $COLOR_MAP->{$COMMAND_DEPTH} || 'bule';
     say color($indent_color), $indent, color('reset'), join q{ }, @cmd;
-    if ($verbose) {
+    if ($ENV{ZENPAN_VERBOSE}) {
         tee_merged { !system @cmd };
     }
     else {
@@ -223,6 +225,7 @@ sub install_from_mirror {
 
 sub run_orepan {
     my ($path, $pause_id, $dist) = @_;
+    local $ENV{ZENPAN_VERBOSE} = 0;
     run 'orepan.pl' => (
         '--destination', $path,
         '--pause', $pause_id,
@@ -295,6 +298,7 @@ sub run_git {
 sub reindex {
     my $path = shift;
     unlink "$path/modules/02packages.details.txt.gz";
+    local $ENV{ZENPAN_VERBOSE} = 0;
     run 'orepan_index.pl', '--repository', $path;
 }
 
