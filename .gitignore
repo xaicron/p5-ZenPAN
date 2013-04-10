@@ -20,7 +20,6 @@ xs/*obj
 dll*
 *~
 README
-LICENSE
 Build
 _build/*
 Makefile.PL
