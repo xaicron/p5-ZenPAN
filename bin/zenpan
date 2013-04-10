@@ -13,6 +13,7 @@ use File::Path qw(mkpath);
 use File::Which qw(which);
 use File::Basename qw(basename);
 use Getopt::Long qw(GetOptions);
+use Pod::Usage qw(pod2usage);
 use Module::CPANfile;
 use CPAN::DistnameInfo;
 use Carton;
@@ -39,7 +40,7 @@ $ENV{ZENPAN_VERBOSE} = 0;
 GetOptions(
     'V|version!' => \&show_version,
     'v|verbose!' => \$ENV{ZENPAN_VERBOSE},
-    'h|help!'    => \&usage,
+    'h|help!'    => sub { pod2usage(-verbose => 2) },
     'p|path=s'   => \my $path,
 ) or short_usage();
 short_usage() unless defined $path;
@@ -307,71 +308,10 @@ sub short_usage {
     print << "USAGE";
 Usage: $me [command] -p /path/to/mirror ...
 
-Try `zenpan --help` or `man zenpan` for more options.
+Try `zenpan -h` or `perldoc zenpan` for more details.
 USAGE
 
     exit 1;
-}
-
-sub usage {
-    my $me = basename $0;
-    print << "USAGE";
-Usage: $me [command] -p /path/to/mirror ...
-
-Options:
-  --path,    -p  Save archives path. (required)
-  --help,    -h  Show this message.
-  --verbose, -v  Chatty print,
-  --version, -V  Show version.
-
-Command:
-  add        Additional into local mirror path
-  remove     Removeing modules from local mirror path
-  reindex    Regen index file
-
-  install    Execute carton install form local mirror path
-
-Examples:
-
-  # add modules from CPAN
-  % zenpan add -p ./mirror Moo
-
-  # add modules from cpanfile
-  % zenpan add -p ./mirror
-
-  % cat cpanfile
-  # git URL
-  requires 'DBIx::QueryLog' => do {
-      \$ENV{ZENPAN_MODE} ? {
-          via    => 'git\@github.com:xaicron/p5-DBIx-QueryLog.git',
-          author => 'XAICRON', # default is DUMMY
-      } : '0';
-  };
-
-  # tarballs URL
-  requires 'App::envfile' => do {
-      \$ENV{ZENPAN_MODE} ? {
-          via => 'http://cpan.metacpan.org/authors/id/X/XA/XAICRON/App-envfile-0.06.tar.gz',
-  };
-
-  # normal case
-  requires 'SQL::Format' => '0';
-  requires 'WWW::Google::Cloud::Messaging' => '0.03';
-
-  # remove modules (TODO)
-  % zepnan remove -p ./mirror SQL::Format
-  % zenpan remove -p ./mirror XAICRON/App-envfile-0.06.tar.gz
-  % zepnan remove -p ./mirror WWW::Google::Cloud::Messaging~0.03
-
-  # reindex
-  % zenpan reindex -p ./mirror
-
-  # carton install
-  % zenpan install
-
-USAGE
-
-    exit;
 }
 
 sub show_version {
@@ -430,6 +370,13 @@ zenpan - yet yet another DarkPAN repository manager.
   % cpanm --mirror-only --mirror=file:///path/to/mirror SQL::Format
 
 I<< zenfile >> foramt details are SEE ALSO C<< perldoc ZenPAN >>.
+
+=head1 OPTIONS
+
+  --path,    -p  Save archives path. (required)
+  --help,    -h  Show usage.
+  --verbose, -v  Chatty print,
+  --version, -V  Show version.
 
 =head1 DESCRIPTION
 
