@@ -16,7 +16,6 @@ use Getopt::Long qw(GetOptions);
 use Pod::Usage qw(pod2usage);
 use Module::CPANfile;
 use CPAN::DistnameInfo;
-use Carton;
 use lib::core::only ();
 
 my $zenpan_cmmand = realpath $0;
