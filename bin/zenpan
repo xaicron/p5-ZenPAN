@@ -243,7 +243,11 @@ sub run_perl {
 
 sub run_zenpan {
     my ($path) = @_;
-    run $zenpan_cmmand, '-p', $path, 'add';
+    run $zenpan_cmmand => (
+        '-p', $path,
+        $ENV{ZENPAN_VERBOSE} ? '-v' : (),
+        'add',
+    );
 }
 
 sub run_git {
