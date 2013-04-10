@@ -381,6 +381,12 @@ I<< zenfile >> foramt details are SEE ALSO C<< perldoc ZenPAN >>.
   --verbose, -v  Chatty print,
   --version, -V  Show version.
 
+=head1 COMMANDS
+
+  add        Additional into local mirror path
+  remove     Removeing modules from local mirror path (NOT IMPLEMENTED)
+  reindex    Regen index file
+
 =head1 DESCRIPTION
 
 ZenPAN is simple wrapper of L<< OrePAN >> and L<< cpanm >>.
