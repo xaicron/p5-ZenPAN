@@ -15,6 +15,8 @@ requires 'File::Temp'         => '0';
 requires 'File::Path'         => '0';
 requires 'lib::core::only'    => '0';
 
+recommends 'Minilla' => 'v0.0.53';
+
 # for M::B
 requires 'Software::License'  => '0.103005';
 

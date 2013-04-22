@@ -260,17 +260,22 @@ sub run_git {
 
     local $COMMAND_DEPTH = $COMMAND_DEPTH + 1;
     if (-f 'Build.PL') {
-        if (-f 'cpanfile') {
-            run_zenpan $path;
+        if (`grep -i minil Build.PL`) {
+            run 'minil dist --no-test';
         }
-        run_cpanm $path, '.';
+        else {
+            if (-f 'cpanfile') {
+                run_zenpan $path;
+            }
+            run_cpanm $path, '.';
 
-        run_perl $path, 'Build.PL';
-        unless (-f 'MANIFEST') {
-            run_perl $path, './Build', 'manifest';
+            run_perl $path, 'Build.PL';
+            unless (-f 'MANIFEST') {
+                run_perl $path, './Build', 'manifest';
+            }
+            run_perl $path, './Build', 'distmeta';
+            run_perl $path, './Build', 'dist';
         }
-        run_perl $path, './Build', 'distmeta';
-        run_perl $path, './Build', 'dist';
     }
     elsif (-f 'Makefile.PL') {
         if (-f 'cpanfile') {
