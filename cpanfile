@@ -10,6 +10,7 @@ requires 'Module::CPANfile'   => '0.9009';
 requires 'CPAN::DistnameInfo' => '0.12';
 requires 'Term::ANSIColor'    => '0';
 requires 'Cwd'                => '0';
+requires 'Cwd::Guard'         => '0';
 requires 'File::Which'        => '1.09';
 requires 'File::Temp'         => '0';
 requires 'File::Path'         => '0';
