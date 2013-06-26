@@ -1,7 +1,6 @@
 cover_db
 MYMETA.*
 META.yml
-META.json
 Makefile
 blib
 inc
@@ -23,3 +22,10 @@ README
 Build
 _build/*
 Makefile.PL
+/ZenPAN-*
+/.build
+/_build_params
+/Build
+!Build/
+!META.json
+!LICENSE
