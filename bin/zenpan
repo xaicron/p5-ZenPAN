@@ -37,10 +37,11 @@ my $default_pause_id = 'DUMMY';
 $ENV{ZENPAN_VERBOSE} = 0;
 
 GetOptions(
-    'V|version!' => \&show_version,
-    'v|verbose!' => \$ENV{ZENPAN_VERBOSE},
-    'h|help!'    => sub { pod2usage(-verbose => 2) },
-    'p|path=s'   => \my $path,
+    'V|version!'  => \&show_version,
+    'v|verbose!'  => \$ENV{ZENPAN_VERBOSE},
+    'h|help!'     => sub { pod2usage(-verbose => 2) },
+    'p|path=s'    => \my $path,
+    '--mirror=s@' => \my @mirror,
 ) or short_usage();
 short_usage() unless defined $path;
 
@@ -211,6 +212,7 @@ sub run_cpanm {
         '--save-dists', $path,
         '--notest',
         '--quiet',
+        (map { +'--mirror' => $_ } @mirror),
         @args,
     );
 }
@@ -246,6 +248,7 @@ sub run_zenpan {
     run $zenpan_cmmand => (
         '-p', $path,
         $ENV{ZENPAN_VERBOSE} ? '-v' : (),
+        (map { +'--mirror' => $_ } @mirror),
         'add',
     );
 }
@@ -356,6 +359,9 @@ zenpan - yet yet another DarkPAN repository manager.
   # add modules from cpanfile
   % zenpan add -p ./mirror
 
+  # add modules from backpan
+  % zenpan add -p ./mirror --mirror http://backpan.perl.org/
+
   % cat cpanfile
   # git URL
   requires 'DBIx::QueryLog' => do {
@@ -394,6 +400,7 @@ I<< zenfile >> foramt details are SEE ALSO C<< perldoc ZenPAN >>.
   --help,    -h  Show usage.
   --verbose, -v  Chatty print,
   --version, -V  Show version.
+  --mirror       Specify the base URL for the mirror (e.g. http://cpan.cpantesters.org/)
 
 =head1 COMMANDS
 
