@@ -267,6 +267,9 @@ sub run_git {
     local $COMMAND_DEPTH = $COMMAND_DEPTH + 1;
     if (-f 'Build.PL') {
         if (`grep -i minil Build.PL`) {
+            if (-f 'cpanfile') {
+                run_zenpan $path;
+            }
             run 'minil dist --no-test';
         }
         else {
