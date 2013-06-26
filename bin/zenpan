@@ -175,7 +175,7 @@ sub save_dist {
 
     say colored ['underline bold'], "Working $dist ...";
 
-    if ($dist =~ /\.git$/) {
+    if ($dist =~ /\.git(?:@.*)?$/) {
         run_git($path, $pause_id, $dist);
     }
     elsif ($dist =~ m|^https?://\w+\.|) {
@@ -255,8 +255,14 @@ sub run_git {
     my $dir = tempdir CLEANUP => 1;
     my $guard = cwd_guard $dir or die "$!: $dir";
 
+    ($repos, my $commit_hash) = split /(?<=\.git)@/i, $repos, 2;
+
     run 'git', 'clone', $repos, "$dir/temp$$";
     my $guard2 = cwd_guard "temp$$" or die "$!: $dir";
+
+    if ($commit_hash) {
+        run 'git', 'checkout', '-b', $commit_hash, $commit_hash;
+    }
 
     local $COMMAND_DEPTH = $COMMAND_DEPTH + 1;
     if (-f 'Build.PL') {
